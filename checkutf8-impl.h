@@ -4,12 +4,6 @@
  * Copyright (C) 2026 Yao Zi <me@ziyao.cc>
  */
 
-/*
- * Some futher optimizations
- * - Add a fast path to process likely ASCII stuff in batch, utilizing the full
- *   machine register (4/8 bytes).
- */
-
 // Trailing bytes are in range [0x80, 0xbf], or [0b1000, 0b1011], i.e. their
 // most significant two bits must be 0b10.
 #define valid_trailer(c)	(((c) & 0xc0) == 0x80)
@@ -24,6 +18,16 @@ UTF8_VALIDATE(const char *str, size_t len)
 		if (p[i] <= 0x7f) {
 			/* [00, 7f] */
 			i++;
+#ifndef BOUNDARY_CHECK
+			/* Skip complete words whose bytes are all ASCII. */
+			while (len - i >= sizeof(uint64_t)) {
+				uint64_t word;
+				memcpy(&word, p + i, sizeof(word));
+				if (word & UINT64_C(0x8080808080808080))
+					break;
+				i += sizeof(word);
+			}
+#endif
 		} else if (p[i] >= 0xc2 && p[i] <= 0xdf) {
 			/* [c2 - df] [80 - bf] */
 #ifdef BOUNDARY_CHECK
@@ -47,8 +51,9 @@ UTF8_VALIDATE(const char *str, size_t len)
 				return i;
 #endif
 
-			if (!valid_trailer(p[i + 1]) ||
-			    !valid_trailer(p[i + 2]))
+			uint16_t trailers;
+			memcpy(&trailers, p + i + 1, sizeof(trailers));
+			if ((trailers & 0xc0c0) != 0x8080)
 				return i;
 
 			// For sequences starting with 0xe0 and 0xed
@@ -68,8 +73,9 @@ UTF8_VALIDATE(const char *str, size_t len)
 				return i;
 #endif
 
-			if (!valid_trailer(p[i + 1]) ||
-			    !valid_trailer(p[i + 2]) ||
+			uint16_t trailers;
+			memcpy(&trailers, p + i + 1, sizeof(trailers));
+			if ((trailers & 0xc0c0) != 0x8080 ||
 			    !valid_trailer(p[i + 3]))
 				return i;
 

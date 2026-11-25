@@ -4,9 +4,8 @@ A simple Lua module for validating and repairing UTF-8 sequences.
 
 ## Installation
 
-This module consists of one C file, `checkutf8.c`, and a C header,
-`checkutf8-impl.h`. It could be built manually with a C compiler, or through
-luarocks.
+Build `checkutf8.c` with `checkutf8-impl.h` and `checkutf8-wide.h` alongside
+it, or run `luarocks make lua-checkutf8-dev-1.rockspec` from this checkout.
 
 lua-checkutf8 requires Lua 5.3 or later, and is only tested with Lua 5.4 and Lua
 5.5.
@@ -45,7 +44,12 @@ Standard, but the Unicode Standard doesn't require such behavior.
 
 ## Performance
 
-See [benchmark.md](./benchmark.md) for details.
+On x86 with a compatible GCC or Clang build, long strings use AVX2 or
+AVX-512BW when available at runtime. CPUs with AVX-512VBMI also accelerate
+runs of common three-byte characters. Short strings and other targets use the
+SSE2 or scalar validator. The default build needs no CPU-specific flags.
+
+See [benchmark.md](./benchmark.md) for measurements.
 
 ## Copyright and License
 
